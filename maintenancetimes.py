@@ -126,7 +126,7 @@ def calculate_time_difs(times_list, fails_list):
             total_machine_list.append(total_failure_list)
             incomp_machine_list.append(incomp_failure_list)
             comp_machine_list.append(comp_failure_list)
-            
+
         total_times_list.append(total_machine_list)
         incomp_times_list.append(incomp_machine_list)
         comp_times_list.append(comp_machine_list)
