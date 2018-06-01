@@ -10,7 +10,41 @@ py.init_notebook_mode(connected=True)
 
 import warnings
 warnings.filterwarnings('ignore')
+# ----------------------------------- #
+#            Laplace Test             #
+# ----------------------------------- #
 
+
+def test_laplace(x, alpha=0.05):
+    r"""
+    For a given vector of failure times, returns the Laplace Test result, showing if times are IID or not
+
+    :param x: Failure times
+    :param alpha: Confidence level
+    :return: Trend of the data
+    """
+
+    if len(x) < 4:
+
+        raise ValueError("Sample size is not big enough for Laplace Test for trend.")
+
+    else:
+
+        total_time = x.sum()
+        number_of_times = len(x)
+        sum_elapsed_times = x.cumsum().sum() - total_time
+
+        test_score = np.sqrt(12 * (number_of_times - 1)) * (sum_elapsed_times /
+                                                            ((number_of_times - 1) * total_time) - 0.5)
+
+        back_limit, front_limit = stats.norm.interval(1-alpha, 0, 1)[0], stats.norm.interval(1-alpha, 0, 1)[1]
+
+        if test_score <= back_limit:
+            return 'Positive Trend'
+        elif test_score >= front_limit:
+            return 'Negative Trend'
+        else:
+            return 'IID Times'
 
 # ----------------------------------- #
 #              PlotProb               #
@@ -162,7 +196,7 @@ def r_sq(dist_fun, params, x):
 # ----------------------------------- #
 #         rank distributions          #
 # ----------------------------------- #
-def rank_dist(x, method='MLE', distributions=None, display=True):
+def rank_dist(x, x_censored=None, method='MLE', distributions=None, display=True):
     r"""
         Rank distributions according to the goodness-of-fit.
         Available distributions:
@@ -177,6 +211,7 @@ def rank_dist(x, method='MLE', distributions=None, display=True):
 
 
     :param x: a 1-D array with the data to be fitted.
+    :param x_censored: a 1-D array with the right-censored data to be fitted.
     :param method: Options: 'MLE' or 'LSQ', meaning, respectively, the Maximum Likelihood Estimation and the Least Squares
     methods for fitting distribution laws to the data.
     :param distributions: a list containing two or more of the available distributions: 'weibull3p', 'weibull2p',
@@ -205,7 +240,7 @@ def rank_dist(x, method='MLE', distributions=None, display=True):
 
         dist_index = range(len(dist_funs))
 
-    elif (type(distributions)==list) & (len(distributions) >= 2):
+    elif (type(distributions) == list) & (len(distributions) >= 2):
 
         dist_index = [i for i, n in enumerate(dist_names) if n in distributions]
 
@@ -220,11 +255,10 @@ def rank_dist(x, method='MLE', distributions=None, display=True):
         pass
 
     elif method.lower() == 'mle':  # Maximum Likelihood Estimation
-
         for dist_i in dist_index:
-            # print(dist_funs)
+
             result[dist_names[dist_i]] = dict()
-            result[dist_names[dist_i]]['params'] = dist_funs[dist_i].fit(x, method='mle')
+            result[dist_names[dist_i]]['params'] = dist_funs[dist_i].fit(x, x_censored, method='mle')
 
             result[dist_names[dist_i]]['goodness_of_fit'] = dict()
 
@@ -439,7 +473,7 @@ class Weibull(object):
         :param params: a list of parameters containing shape, scale and location. If the length of parameter is lower
         than 3, than the parameter should be placed in order.
         :param x: a number, a list, or an array of x values for computing probability.
-        :return: Probability of x given the distribtuion parameters.
+        :return: Probability of x given the distribution parameters.
         """
 
         if len(params) == len(self._not_params_i):
@@ -460,6 +494,7 @@ class Weibull(object):
 
         prob = np.nan_to_num((shape / scale) * ((x - loc) / scale) ** (shape - 1) *\
                              np.exp(-((x - loc) / scale)**shape))
+
         return prob
 
     # ----------------------------------- #
@@ -472,7 +507,7 @@ class Weibull(object):
         :param params: a list of parameters containing 1) shape, 2) scale and 3) location. If the length of parameter is lower
         than 3, than the parameters should be placed in the given order.
         :param x: a number, a list, or an array of x values for computing probability.
-        :return: Cumulative Probability for x given the distribtuion parameters.
+        :return: Cumulative Probability for x given the distribution parameters.
         """
 
         if len(params) == len(self._not_params_i):
@@ -488,6 +523,33 @@ class Weibull(object):
         loc = self._params[2]
 
         return np.nan_to_num(1-np.exp(-((x-loc)/scale)**shape))
+
+    # ----------------------------------- #
+    #                1-CDF                #
+    # ----------------------------------- #
+    def inv_cdf(self, params, x):
+        r"""
+        Computes the CDF of Weibull 2 or 3 parameters.
+
+        :param params: a list of parameters containing 1) shape, 2) scale and 3) location. If the length of parameter is lower
+        than 3, than the parameters should be placed in the given order.
+        :param x: a number, a list, or an array of x values for computing probability.
+        :return: Cumulative Probability for x given the distribution parameters.
+        """
+
+        if len(params) == len(self._not_params_i):
+            self._params[self._not_params_i] = params
+        else:
+            print('Len params: {}'.format(len(params)))
+            print('Len self._params: {}'.format(len(self._params)))
+
+            raise ValueError('The size of parameters is not correct.')
+
+        shape = self._params[0]
+        scale = self._params[1]
+        loc = self._params[2]
+
+        return np.nan_to_num(np.exp(-((x-loc)/scale)**shape))
 
     # ----------------------------------- #
     #                 PPF                 #
@@ -515,9 +577,9 @@ class Weibull(object):
     # ----------------------------------- #
     #              neg_log_lk             #
     # ----------------------------------- #
-    def neg_log_lk(self, params, x):
+    def neg_log_lk(self, params, x, x_censored):
         r"""
-        Computes negative sum of log-likelihood for the probability of x given the distribtuion parameters of Weibull 2
+        Computes negative sum of log-likelihood for the probability of x given the distribution parameters of Weibull 2
         or 3 parameters. This function is useful as a cost function for optimization problem regarding Maximum
         Likelihood Estimation (MLE) of the parameters. The log transformation is required to convert produtory of
         the Likelihood function in a sum.
@@ -525,24 +587,26 @@ class Weibull(object):
         :param params: a list of parameters containing shape, scale and location. If the length of parameter is lower
         than 3, than the parameter should be placed in order.
         :param x: a number, a list, or an array of x values for computing probability.
-        :return: negative sum of log-likelihood for the probability of x given the distribtuion parameters.
+        :param x_censored: a number, a list, or an array of x values for computing cumulative probability.
+        :return: negative sum of log-likelihood for the probability of x given the distribution parameters.
         """
 
-        return -np.nansum(np.log(np.nan_to_num(self.pdf(params, x))))
+        return -np.nansum(np.log(np.nan_to_num(self.pdf(params, x))) + np.log(np.nan_to_num(self.inv_cdf(params,
+                                                                                                         x_censored))))
 
     # ----------------------------------- #
     #              neg_log_lk             #
     # ----------------------------------- #
-    def log_lk(self, params, x):
+    def log_lk(self, params, x, ):
         r"""
-        Computes sum of log-likelihood for the probability of x given the distribtuion parameters of Weibull 2
+        Computes sum of log-likelihood for the probability of x given the distribution parameters of Weibull 2
         or 3 parameters. This function is useful for model validation, i.e. goodness-of-fit. The log transformation is
         required to convert produtory of the Likelihood function in a sum.
 
         :param params: a list of parameters containing shape, scale and location. If the length of parameter is lower
         than 3, than the parameter should be placed in order.
         :param x: a number, a list, or an array of x values for computing probability.
-        :return: negative sum of log-likelihood for the probability of x given the distribtuion parameters.
+        :return: negative sum of log-likelihood for the probability of x given the distribution parameters.
         """
 
         return np.nansum(np.log(np.nan_to_num(self.pdf(params, x))))
@@ -550,13 +614,14 @@ class Weibull(object):
     # ----------------------------------- #
     #                 fit                 #
     # ----------------------------------- #
-    def fit(self, x, method='MLE', implementation=None):
+    def fit(self, x, x_censored, method='MLE', implementation=None):
         r"""
         Fits the distribution to the data returning the parameters defining the Weibull distribution.
         By default it estimates the 3 parameters via MLE. The user may choose the regression method for fitting,
         as well as fixing any of the 3 parameters for finding the remainder.
 
         :param x: a 1D array of data to be fitted.
+        :param x_censored: a 1D array of censored data to be fitted.
         :param method: Maximum Likelihood Estimation, or Least Squares Regression.
         :param implementation: (for 3 parameter fitting only) Depending on the implementation results might vary
         slightly, although being mathematically acceptable.
@@ -625,10 +690,10 @@ class Weibull(object):
                     self.fix()  # initialize params
                     res_init = opt.differential_evolution(self.neg_log_lk,
                                                           # popsize=10,
-                                                          bounds=bounds_weibull, args=(x,))
+                                                          bounds=bounds_weibull, args=(x, x_censored,))
 
                     # second locally optimize all parameter by gradient method to converge to the local minimum
-                    res_opt = opt.minimize(self.neg_log_lk, res_init.x, args=(x,),
+                    res_opt = opt.minimize(self.neg_log_lk, res_init.x, args=(x, x_censored,),
                                      #method='L-BFGS-B',
                                      # method='Nelder-Mead',
                                      #bounds=bounds_weibull
@@ -641,23 +706,23 @@ class Weibull(object):
                     # First fix location at 0 and find shape and scale.
                     self.fix(loc=0)
 
-                    res_1 = opt.minimize(self.neg_log_lk, [1, np.mean(x)], args=(x,),
+                    res_1 = opt.minimize(self.neg_log_lk, [1, np.mean(x)], args=(x, x_censored,),
                                          # method='L-BFGS-B',
                                          method='Nelder-Mead'
                                          )
-
+                    print("1", res_1)
                     # print(res_1.success)
                     params_init = res_1.x
                     # print('Params 1): {}'.format(params_init))
-
+                    print(params_init)
                     # Second fix shape and scale and find Location
                     self.fix(shape=params_init[0], scale=params_init[1])
 
-                    res_2 = opt.minimize(self.neg_log_lk, [np.min(x)], args=(x,),
+                    res_2 = opt.minimize(self.neg_log_lk, [np.min(x)], args=(x, x_censored,),
                                          # method='L-BFGS-B'
                                          method='Nelder-Mead'
                                          )
-
+                    print("2", res_2)
                     # print(res_2.success)
                     loc_rs = res_2.x[0]
                     # print('loc 2): {}'.format(loc_our))
@@ -665,8 +730,8 @@ class Weibull(object):
                     # third locally optimize shape and scale  by gradient method, fixing location
                     self.fix(loc=loc_rs)
 
-                    res_3 = opt.minimize(self.neg_log_lk, params_init, args=(x,))
-
+                    res_3 = opt.minimize(self.neg_log_lk, params_init, args=(x, x_censored))
+                    print("3", res_3)
                     # print(res_3.success)
                     params_rs = np.append(res_3.x, loc_rs)
 
@@ -677,7 +742,7 @@ class Weibull(object):
                         np.sum([(1-p_value_global) * np.array(params_rs), p_value_global * np.array(params_global)], axis=0))  # weighted sum
 
                     self.fix()
-
+                    print(params)
                 elif implementation.lower() == 'global':
                     # My method for MLE of parameters in a 3 parameter weibull.
 
@@ -733,15 +798,17 @@ class Weibull(object):
             self.fix()
 
         elif (len(self._not_params_i) <= 2) & (len(self._not_params_i) != 0):
-            init_params = np.array([1, np.mean(x), np.min(x)])[self._not_params_i]
+            init_params = np.array([0, np.mean(x), np.min(x)])[self._not_params_i]
+            print('not_params:', self._not_params_i)
+            print('init_params:', init_params)
             bounds_weibull = np.array([(1e-6, 2), (1, np.max(x)), (0, 3 - 1e-6)])[self._not_params_i]
-
+            print('bounds_weibull:', bounds_weibull)
             if implementation is None:
-                implementation = 'scipy'
+                implementation = 'nano'
 
             if method.lower() == 'mle':
                 if implementation.lower() == 'nano':
-                    res_1 = opt.minimize(self.neg_log_lk, init_params, args=(x,),
+                    res_1 = opt.minimize(self.neg_log_lk, init_params, args=(x, x_censored),
                                          method='L-BFGS-B',
                                          # method='Nelder-Mead',
                                          bounds=bounds_weibull
@@ -854,7 +921,7 @@ class Normal(object):
 
         :param params: a list of parameters containing 1) mean and 2) standard deviation.
         :param x: a number, a list, or an array of x values for computing probability.
-        :return: Probability of x given the distribtuion parameters.
+        :return: Probability of x given the distribution parameters.
         """
 
         if len(params) == len(self._not_params_i):
@@ -878,7 +945,7 @@ class Normal(object):
 
         :param params: a list of parameters containing 1) mean and 2) standard deviation.
         :param x: a number, a list, or an array of x values for computing probability.
-        :return: Cumulative Probability for x given the distribtuion parameters.
+        :return: Cumulative Probability for x given the distribution parameters.
         """
         if len(params) == len(self._not_params_i):
             self._params[self._not_params_i] = params
@@ -925,7 +992,7 @@ class Normal(object):
 
         :param params: a list of parameters containing 1) mean and 2) standard deviation.
         :param x: a number, a list, or an array of x values for computing probability.
-        :return: negative sum of log-likelihood for the probability of x given the distribtuion parameters.
+        :return: negative sum of log-likelihood for the probability of x given the distribution parameters.
         """
         if len(params) == len(self._not_params_i):
             self._params[self._not_params_i] = params
@@ -950,7 +1017,7 @@ class Normal(object):
 
         :param params: a list of parameters containing 1) mean and 2) standard deviation.
         :param x: a number, a list, or an array of x values for computing probability.
-        :return: negative sum of log-likelihood for the probability of x given the distribtuion parameters.
+        :return: negative sum of log-likelihood for the probability of x given the distribution parameters.
         """
 
         if len(params) == len(self._not_params_i):
@@ -968,7 +1035,7 @@ class Normal(object):
     # ----------------------------------- #
     #                 fit                 #
     # ----------------------------------- #
-    def fit(self, x, method='mle'):  # TODO add method and implementation kwds (if really necessary, or for homogeneity of functions)
+    def fit(self, x, x_censored, method='mle'):  # TODO add method and implementation kwds (if really necessary, or for homogeneity of functions)
         r"""
         Fits the distribution to the data returning the parameters defining the Normal distribution.
                 By default it estimates the 2 parameters via direct method. The user may fix any of the  parameters by
@@ -1057,7 +1124,7 @@ class Lognormal(object):
 
         :param params: a list of parameters containing 1) mean and 2) standard deviation.
         :param x: a number, a list, or an array of x values for computing probability.
-        :return: Probability of x given the distribtuion parameters.
+        :return: Probability of x given the distribution parameters.
         """
 
         if len(params) == len(self._not_params_i):
@@ -1084,7 +1151,7 @@ class Lognormal(object):
 
         :param params: a list of parameters containing 1) mean and 2) standard deviation.
         :param x: a number, a list, or an array of x values for computing probability.
-        :return: Cumulative Probability for x given the distribtuion parameters.
+        :return: Cumulative Probability for x given the distribution parameters.
         """
         if len(params) == len(self._not_params_i):
             self._params[self._not_params_i] = params
@@ -1137,7 +1204,7 @@ class Lognormal(object):
 
         :param params: a list of parameters containing 1) mean and 2) standard deviation.
         :param x: a number, a list, or an array of x values for computing probability.
-        :return: negative sum of log-likelihood for the probability of x given the distribtuion parameters.
+        :return: negative sum of log-likelihood for the probability of x given the distribution parameters.
         """
         if len(params) == len(self._not_params_i):
             self._params[self._not_params_i] = params
@@ -1165,7 +1232,7 @@ class Lognormal(object):
 
         :param params: a list of parameters containing 1) mean and 2) standard deviation.
         :param x: a number, a list, or an array of x values for computing probability.
-        :return: negative sum of log-likelihood for the probability of x given the distribtuion parameters.
+        :return: negative sum of log-likelihood for the probability of x given the distribution parameters.
         """
 
         if len(params) == len(self._not_params_i):
@@ -1186,7 +1253,7 @@ class Lognormal(object):
     # ----------------------------------- #
     #                 fit                 #
     # ----------------------------------- #
-    def fit(self, x, method='MLE'):  # TODO add implementation kwds (if really necessary, or for homogeneity of functions)
+    def fit(self, x, x_censored, method='MLE'):  # TODO add implementation kwds (if really necessary, or for homogeneity of functions)
         r"""
         Fits the distribution to the data returning the parameters defining the Log-Normal distribution.
                 By default it estimates the 2 parameters via direct method. The user may fix any of the  parameters by
@@ -1286,7 +1353,7 @@ class Exponential(object):
 
         :param params: a list of parameters containing 1) scale and 2) location.
         :param x: a number, a list, or an array of x values for computing probability.
-        :return: Probability of x given the distribtuion parameters.
+        :return: Probability of x given the distribution parameters.
         """
 
         if len(params) == len(self._not_params_i):
@@ -1311,7 +1378,7 @@ class Exponential(object):
 
         :param params: a list of parameters containing 1) scale and 2) location.
         :param x: a number, a list, or an array of x values for computing probability.
-        :return: Cumulative Probability for x given the distribtuion parameters.
+        :return: Cumulative Probability for x given the distribution parameters.
         """
         if len(params) == len(self._not_params_i):
             self._params[self._not_params_i] = params
@@ -1360,7 +1427,7 @@ class Exponential(object):
 
         :param params: a list of parameters containing 1) scale and 2) location.
         :param x: a number, a list, or an array of x values for computing probability.
-        :return: negative sum of log-likelihood for the probability of x given the distribtuion parameters.
+        :return: negative sum of log-likelihood for the probability of x given the distribution parameters.
         """
         if len(params) == len(self._not_params_i):
             self._params[self._not_params_i] = params
@@ -1386,7 +1453,7 @@ class Exponential(object):
 
         :param params: a list of parameters containing 1) scale and 2) location.
         :param x: a number, a list, or an array of x values for computing probability.
-        :return: negative sum of log-likelihood for the probability of x given the distribtuion parameters.
+        :return: negative sum of log-likelihood for the probability of x given the distribution parameters.
         """
 
         if len(params) == len(self._not_params_i):
@@ -1405,7 +1472,7 @@ class Exponential(object):
         # ----------------------------------- #
         #                 fit                 #
         # ----------------------------------- #
-    def fit(self, x, method='MLE'):  # TODO add implementation kwds (if really necessary, or for homogeneity of functions)
+    def fit(self, x, x_censored, method='MLE'):  # TODO add implementation kwds (if really necessary, or for homogeneity of functions)
         r"""
         Fits the distribution to the data returning the parameters defining the Log-Normal distribution.
                 By default it estimates the 2 parameters via direct method. The user may fix any of the  parameters by
@@ -1539,7 +1606,7 @@ class Logistic(object):
 
         :param params: a list of parameters containing 1) scale and 2) location.
         :param x: a number, a list, or an array of x values for computing probability.
-        :return: Probability of x given the distribtuion parameters.
+        :return: Probability of x given the distribution parameters.
         """
 
         if len(params) == len(self._not_params_i):
@@ -1564,7 +1631,7 @@ class Logistic(object):
 
         :param params: a list of parameters containing 1) scale and 2) location.
         :param x: a number, a list, or an array of x values for computing probability.
-        :return: Cumulative Probability for x given the distribtuion parameters.
+        :return: Cumulative Probability for x given the distribution parameters.
         """
         if len(params) == len(self._not_params_i):
             self._params[self._not_params_i] = params
@@ -1612,7 +1679,7 @@ class Logistic(object):
 
         :param params: a list of parameters containing 1) scale and 2) location.
         :param x: a number, a list, or an array of x values for computing probability.
-        :return: negative sum of log-likelihood for the probability of x given the distribtuion parameters.
+        :return: negative sum of log-likelihood for the probability of x given the distribution parameters.
         """
 
         return -np.nansum(np.log(np.nan_to_num(self.pdf(params, x))))
@@ -1628,7 +1695,7 @@ class Logistic(object):
 
         :param params: a list of parameters containing 1) scale and 2) location.
         :param x: a number, a list, or an array of x values for computing probability.
-        :return: negative sum of log-likelihood for the probability of x given the distribtuion parameters.
+        :return: negative sum of log-likelihood for the probability of x given the distribution parameters.
         """
 
         return np.nansum(np.log(np.nan_to_num(self.pdf(params, x))))
@@ -1636,7 +1703,7 @@ class Logistic(object):
         # ----------------------------------- #
         #                 fit                 #
         # ----------------------------------- #
-    def fit(self, x, method='MLE', implementation=None):  # TODO add implementation kwds (if really necessary, or for homogeneity of functions)
+    def fit(self, x, x_censored, method='MLE', implementation=None):  # TODO add implementation kwds (if really necessary, or for homogeneity of functions)
         r"""
         Fits the distribution to the data returning the parameters defining the Logistic distribution.
                 By default it estimates the 2 parameters via direct method. The user may fix any of the  parameters by
@@ -1740,7 +1807,7 @@ class Loglogistic(object):
 
         :param params: a list of parameters containing 1) shape and 2) scale.
         :param x: a number, a list, or an array of x values for computing probability.
-        :return: Probability of x given the distribtuion parameters.
+        :return: Probability of x given the distribution parameters.
         """
 
         if len(params) == len(self._not_params_i):
@@ -1765,7 +1832,7 @@ class Loglogistic(object):
 
         :param params: a list of parameters containing 1) scale and 2) location.
         :param x: a number, a list, or an array of x values for computing probability.
-        :return: Cumulative Probability for x given the distribtuion parameters.
+        :return: Cumulative Probability for x given the distribution parameters.
         """
         if len(params) == len(self._not_params_i):
             self._params[self._not_params_i] = params
@@ -1790,7 +1857,7 @@ class Loglogistic(object):
 
         :param params: a list of parameters containing 1) scale and 2) location.
         :param q: a number, a list, or an array of x values for computing probability.
-        :return: Cumulative Probability for x given the distribtuion parameters.
+        :return: Cumulative Probability for x given the distribution parameters.
         """
         if len(params) == len(self._not_params_i):
             self._params[self._not_params_i] = params
@@ -1811,12 +1878,12 @@ class Loglogistic(object):
         r"""
         Computes negative sum of log-likelihood for the probability of x given the distribution parameters. This
         function is useful as a cost function for optimization problem regarding Maximum
-        Likelihood Estimation (MLE) of the parameters. The log transformation is required to convert produtory of
+        Likelihood Estimation (MLE) of the parameters. The log transformation is required to convert productory of
         the Likelihood function in a sum.
 
         :param params: a list of parameters containing 1) scale and 2) location.
         :param x: a number, a list, or an array of x values for computing probability.
-        :return: negative sum of log-likelihood for the probability of x given the distribtuion parameters.
+        :return: negative sum of log-likelihood for the probability of x given the distribution parameters.
         """
 
         return -np.nansum(np.log(np.nan_to_num(self.pdf(params, x))))
@@ -1832,7 +1899,7 @@ class Loglogistic(object):
 
         :param params: a list of parameters containing 1) scale and 2) location.
         :param x: a number, a list, or an array of x values for computing probability.
-        :return: negative sum of log-likelihood for the probability of x given the distribtuion parameters.
+        :return: negative sum of log-likelihood for the probability of x given the distribution parameters.
         """
 
         return np.nansum(np.log(np.nan_to_num(self.pdf(params, x))))
@@ -1840,7 +1907,7 @@ class Loglogistic(object):
         # ----------------------------------- #
         #                 fit                 #
         # ----------------------------------- #
-    def fit(self, x, method='MLE', implementation=None):  # TODO add implementation kwds (if really necessary, or for homogeneity of functions)
+    def fit(self, x, x_censored, method='MLE', implementation=None):  # TODO add implementation kwds (if really necessary, or for homogeneity of functions)
         r"""
         Fits the distribution to the data returning the parameters defining the Logistic distribution.
                 By default it estimates the 2 parameters via direct method. The user may fix any of the  parameters by
