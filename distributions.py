@@ -38,7 +38,7 @@ def test_laplace(x, alpha=0.05):
                                                             ((number_of_times - 1) * total_time) - 0.5)
 
         back_limit, front_limit = stats.norm.interval(1-alpha, 0, 1)[0], stats.norm.interval(1-alpha, 0, 1)[1]
-
+        print(back_limit)
         if test_score <= back_limit:
             return 'Positive Trend'
         elif test_score >= front_limit:
@@ -258,7 +258,7 @@ def rank_dist(x, x_censored=None, method='MLE', distributions=None, display=True
         for dist_i in dist_index:
 
             result[dist_names[dist_i]] = dict()
-            result[dist_names[dist_i]]['params'] = dist_funs[dist_i].fit(x, x_censored, method='mle')
+            result[dist_names[dist_i]]['params'] = dist_funs[dist_i].fit(x, method='mle')
 
             result[dist_names[dist_i]]['goodness_of_fit'] = dict()
 
@@ -577,7 +577,7 @@ class Weibull(object):
     # ----------------------------------- #
     #              neg_log_lk             #
     # ----------------------------------- #
-    def neg_log_lk(self, params, x, x_censored):
+    def neg_log_lk(self, params, x):
         r"""
         Computes negative sum of log-likelihood for the probability of x given the distribution parameters of Weibull 2
         or 3 parameters. This function is useful as a cost function for optimization problem regarding Maximum
@@ -591,13 +591,12 @@ class Weibull(object):
         :return: negative sum of log-likelihood for the probability of x given the distribution parameters.
         """
 
-        return -np.nansum(np.log(np.nan_to_num(self.pdf(params, x))) + np.log(np.nan_to_num(self.inv_cdf(params,
-                                                                                                         x_censored))))
+        return -np.nansum(np.log(np.nan_to_num(self.pdf(params, x))))
 
     # ----------------------------------- #
-    #              neg_log_lk             #
+    #                log_lk               #
     # ----------------------------------- #
-    def log_lk(self, params, x, ):
+    def log_lk(self, params, x):
         r"""
         Computes sum of log-likelihood for the probability of x given the distribution parameters of Weibull 2
         or 3 parameters. This function is useful for model validation, i.e. goodness-of-fit. The log transformation is
@@ -614,7 +613,7 @@ class Weibull(object):
     # ----------------------------------- #
     #                 fit                 #
     # ----------------------------------- #
-    def fit(self, x, x_censored, method='MLE', implementation=None):
+    def fit(self, x, method='MLE', implementation=None):
         r"""
         Fits the distribution to the data returning the parameters defining the Weibull distribution.
         By default it estimates the 3 parameters via MLE. The user may choose the regression method for fitting,
@@ -690,10 +689,10 @@ class Weibull(object):
                     self.fix()  # initialize params
                     res_init = opt.differential_evolution(self.neg_log_lk,
                                                           # popsize=10,
-                                                          bounds=bounds_weibull, args=(x, x_censored,))
+                                                          bounds=bounds_weibull, args=(x,))
 
                     # second locally optimize all parameter by gradient method to converge to the local minimum
-                    res_opt = opt.minimize(self.neg_log_lk, res_init.x, args=(x, x_censored,),
+                    res_opt = opt.minimize(self.neg_log_lk, res_init.x, args=(x,),
                                      #method='L-BFGS-B',
                                      # method='Nelder-Mead',
                                      #bounds=bounds_weibull
@@ -706,23 +705,23 @@ class Weibull(object):
                     # First fix location at 0 and find shape and scale.
                     self.fix(loc=0)
 
-                    res_1 = opt.minimize(self.neg_log_lk, [1, np.mean(x)], args=(x, x_censored,),
+                    res_1 = opt.minimize(self.neg_log_lk, [1, np.mean(x)], args=(x,),
                                          # method='L-BFGS-B',
                                          method='Nelder-Mead'
                                          )
-                    print("1", res_1)
+
                     # print(res_1.success)
                     params_init = res_1.x
                     # print('Params 1): {}'.format(params_init))
-                    print(params_init)
+
                     # Second fix shape and scale and find Location
                     self.fix(shape=params_init[0], scale=params_init[1])
 
-                    res_2 = opt.minimize(self.neg_log_lk, [np.min(x)], args=(x, x_censored,),
+                    res_2 = opt.minimize(self.neg_log_lk, [np.min(x)], args=(x,),
                                          # method='L-BFGS-B'
                                          method='Nelder-Mead'
                                          )
-                    print("2", res_2)
+
                     # print(res_2.success)
                     loc_rs = res_2.x[0]
                     # print('loc 2): {}'.format(loc_our))
@@ -730,8 +729,8 @@ class Weibull(object):
                     # third locally optimize shape and scale  by gradient method, fixing location
                     self.fix(loc=loc_rs)
 
-                    res_3 = opt.minimize(self.neg_log_lk, params_init, args=(x, x_censored))
-                    print("3", res_3)
+                    res_3 = opt.minimize(self.neg_log_lk, params_init, args=(x,))
+
                     # print(res_3.success)
                     params_rs = np.append(res_3.x, loc_rs)
 
@@ -742,7 +741,7 @@ class Weibull(object):
                         np.sum([(1-p_value_global) * np.array(params_rs), p_value_global * np.array(params_global)], axis=0))  # weighted sum
 
                     self.fix()
-                    print(params)
+
                 elif implementation.lower() == 'global':
                     # My method for MLE of parameters in a 3 parameter weibull.
 
@@ -799,16 +798,16 @@ class Weibull(object):
 
         elif (len(self._not_params_i) <= 2) & (len(self._not_params_i) != 0):
             init_params = np.array([0, np.mean(x), np.min(x)])[self._not_params_i]
-            print('not_params:', self._not_params_i)
-            print('init_params:', init_params)
+            #print('not_params:', self._not_params_i)
+            #print('init_params:', init_params)
             bounds_weibull = np.array([(1e-6, 2), (1, np.max(x)), (0, 3 - 1e-6)])[self._not_params_i]
-            print('bounds_weibull:', bounds_weibull)
+            #('bounds_weibull:', bounds_weibull)
             if implementation is None:
                 implementation = 'nano'
 
             if method.lower() == 'mle':
                 if implementation.lower() == 'nano':
-                    res_1 = opt.minimize(self.neg_log_lk, init_params, args=(x, x_censored),
+                    res_1 = opt.minimize(self.neg_log_lk, init_params, args=(x,),
                                          method='L-BFGS-B',
                                          # method='Nelder-Mead',
                                          bounds=bounds_weibull
@@ -1035,7 +1034,7 @@ class Normal(object):
     # ----------------------------------- #
     #                 fit                 #
     # ----------------------------------- #
-    def fit(self, x, x_censored, method='mle'):  # TODO add method and implementation kwds (if really necessary, or for homogeneity of functions)
+    def fit(self, x, method='mle'):  # TODO add method and implementation kwds (if really necessary, or for homogeneity of functions)
         r"""
         Fits the distribution to the data returning the parameters defining the Normal distribution.
                 By default it estimates the 2 parameters via direct method. The user may fix any of the  parameters by
@@ -1253,7 +1252,7 @@ class Lognormal(object):
     # ----------------------------------- #
     #                 fit                 #
     # ----------------------------------- #
-    def fit(self, x, x_censored, method='MLE'):  # TODO add implementation kwds (if really necessary, or for homogeneity of functions)
+    def fit(self, x, method='MLE'):  # TODO add implementation kwds (if really necessary, or for homogeneity of functions)
         r"""
         Fits the distribution to the data returning the parameters defining the Log-Normal distribution.
                 By default it estimates the 2 parameters via direct method. The user may fix any of the  parameters by
@@ -1472,7 +1471,7 @@ class Exponential(object):
         # ----------------------------------- #
         #                 fit                 #
         # ----------------------------------- #
-    def fit(self, x, x_censored, method='MLE'):  # TODO add implementation kwds (if really necessary, or for homogeneity of functions)
+    def fit(self, x, method='MLE'):  # TODO add implementation kwds (if really necessary, or for homogeneity of functions)
         r"""
         Fits the distribution to the data returning the parameters defining the Log-Normal distribution.
                 By default it estimates the 2 parameters via direct method. The user may fix any of the  parameters by
@@ -1703,7 +1702,7 @@ class Logistic(object):
         # ----------------------------------- #
         #                 fit                 #
         # ----------------------------------- #
-    def fit(self, x, x_censored, method='MLE', implementation=None):  # TODO add implementation kwds (if really necessary, or for homogeneity of functions)
+    def fit(self, x, method='MLE', implementation=None):  # TODO add implementation kwds (if really necessary, or for homogeneity of functions)
         r"""
         Fits the distribution to the data returning the parameters defining the Logistic distribution.
                 By default it estimates the 2 parameters via direct method. The user may fix any of the  parameters by
@@ -1907,7 +1906,7 @@ class Loglogistic(object):
         # ----------------------------------- #
         #                 fit                 #
         # ----------------------------------- #
-    def fit(self, x, x_censored, method='MLE', implementation=None):  # TODO add implementation kwds (if really necessary, or for homogeneity of functions)
+    def fit(self, x, method='MLE', implementation=None):  # TODO add implementation kwds (if really necessary, or for homogeneity of functions)
         r"""
         Fits the distribution to the data returning the parameters defining the Logistic distribution.
                 By default it estimates the 2 parameters via direct method. The user may fix any of the  parameters by

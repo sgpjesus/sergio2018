@@ -11,7 +11,7 @@ warnings.filterwarnings('ignore')
 
 def main_pipeline(path):
     r"""
-    For a given maintenance oriented .csv file, with the column scheme given by specification , this function is
+    For a given maintenance oriented .csv file, with the column scheme given by specification, this function is
     capable of dividing total, complete and incomplete times in three different pandas.DataFrame.
     :param path: path to the .csv file
     :return: Dataframes

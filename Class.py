@@ -46,7 +46,7 @@ class DocumentDataFrame:
         return tf_idf.fit_transform(self.data_series), tf_idf
 
     def normalize_count_matrix(self):
-        count_matrix = self.count_matrix()
+        count_matrix = self.count_matrix()[0]
         normalized_count_matrix = scipy.sparse.lil_matrix((count_matrix.shape[0], count_matrix.shape[1]))
         for row_id in range(count_matrix.shape[0]):
             if count_matrix[row_id,:].max()!= 0:
@@ -54,8 +54,9 @@ class DocumentDataFrame:
         return normalized_count_matrix
 
     def cbtw_vec(self, y):
-        term_frequency_matrix = self.count_matrix()
+        term_frequency_matrix = self.count_matrix()[0]
         y = np.array([y]).transpose()
+        print(type(term_frequency_matrix))
         matrix_indexes = term_frequency_matrix.nonzero()
         data_indexes = np.where(term_frequency_matrix.data != 0)[0]
         n_data = len(data_indexes)
@@ -75,4 +76,4 @@ class DocumentDataFrame:
     def cbtw_matrix(self, y):
         vec = self.cbtw_vec(y)
         matrix = self.normalize_count_matrix()
-        return matrix.multiply(vec)
+        return scipy.sparse.csr_matrix(matrix.multiply(vec))
