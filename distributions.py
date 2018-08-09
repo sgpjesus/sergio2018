@@ -677,7 +677,7 @@ class Weibull(object):
 
         # If the initialization was made with no fixed parameters
         if len(self._not_params_i) == 3:
-
+            # TODO Clean the code at this part (a lot of ifs and checks)
             # Most likelihood estimation method
             if method.lower() == 'mle':
 
@@ -687,6 +687,7 @@ class Weibull(object):
                     shape, loc, scale = stats.weibull_min.fit(x)
                     params = [shape, scale, loc]
 
+                #
                 elif implementation.lower() == 'reliasoft':
                     # First fix location at 0 and find shape and scale.
                     self.fix(loc=0)
@@ -723,13 +724,19 @@ class Weibull(object):
                     params = list(np.append(res_3.x, loc_rs))
 
                 elif implementation.lower() == 'nano':
-                    # model 1) scipy: -----------------
 
-                    # shape, loc, scale = stats.weibull_min.fit(x)
-                    # params_scipy = [shape, scale, loc]
-
-                    # model 1.1) Global: (reason: scipy shows instability) ------------
-                    # TODO talk about these bounds assumptions
+                    """ Bound assumptions:
+                    For shape (beta), a value between a small number and two is 
+                    what is wanted to fit, since in that case, the failure rate
+                    is in limit slightly increasing over time.
+                    
+                    For scale (mu), the value must be between one (smallest 
+                    measurement possible, assuming there are no decimals) and
+                     the maximum of values of our failure event array. 
+                    
+                    Location (gamma) has no meaning for now(...) 
+                    """
+                    # TODO Get better assumptions for beta and gamma (ours)
                     bounds_weibull = [(1e-6, 2), (1, np.max(x)), (0, 3 - 1e-6)]
 
                     # first globally optimize all parameter by differential evolution to avoid local minima
