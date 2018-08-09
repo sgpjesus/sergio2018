@@ -639,8 +639,12 @@ class Weibull(object):
         :param params: a list of parameters containing shape, scale and
         location. If the length of parameter is lower  than 3, than the
         parameter should be placed in order.
-        :param x: a number, a list, or an array of x values for computing probability.
-        :return: negative sum of log-likelihood for the probability of x given the distribution parameters.
+        :param x: a number, a list, or an array of x values for computing
+        probability.
+        :param x_censored: a number, a list, or an array of x values for
+        computing cumulative probability.
+        :return: negative sum of log-likelihood for the probability of x given
+        the distribution parameters.
         """
         # Uncensored probability
         prob_x = np.nan_to_num(self.pdf(params, x))
@@ -652,30 +656,34 @@ class Weibull(object):
     # ----------------------------------- #
     #                 fit                 #
     # ----------------------------------- #
-    def fit(self, x, x_censored=None, method='MLE', implementation=None):
+    def fit(self, x, x_censored=None, method='MLE', implementation='nano'):
         r"""
-        Fits the distribution to the data returning the parameters defining the Weibull distribution.
-        By default it estimates the 3 parameters via MLE. The user may choose the regression method for fitting,
-        as well as fixing any of the 3 parameters for finding the remainder.
+        Fits the distribution to the data returning the parameters defining the
+        Weibull distribution. By default it estimates the 3 parameters via MLE.
+        The user may choose the regression method for fitting, as well as fixing
+        any of the 3 parameters for finding the remainder.
 
         :param x: a 1D array of data to be fitted.
         :param x_censored: a 1D array of censored data to be fitted.
-        :param method: Maximum Likelihood Estimation, or Least Squares Regression.
-        :param implementation: (for 3 parameter fitting only) Depending on the implementation results might vary
-        slightly, although being mathematically acceptable.
+        :param method: Maximum Likelihood Estimation, or Least Squares
+        Regression.
+        :param implementation: (for 3 parameter fitting only) Depending on the
+        implementation results might vary slightly, although being
+        mathematically acceptable.
         :return: a list of the fitted parameters [shape, scale, loc].
         """
 
         params = list()
 
-        if len(self._not_params_i) == 3:  # if the initialization was made with no fixed parameters
+        # If the initialization was made with no fixed parameters
+        if len(self._not_params_i) == 3:
 
-            if implementation is None:
-                implementation = 'nano'
-                # implementation = 'global'
-
+            # Most likelihood estimation method
             if method.lower() == 'mle':
+
+                # Scipy library fitting
                 if implementation == 'scipy':
+
                     shape, loc, scale = stats.weibull_min.fit(x)
                     params = [shape, scale, loc]
 
