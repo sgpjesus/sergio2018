@@ -1,44 +1,50 @@
 import numpy as np
+import pandas as pd
+import warnings
+import qgrid
 import scipy.stats as stats
 import scipy.optimize as opt
-import pandas as pd
-import qgrid
-
 import matplotlib.pyplot as plt
 import plotly.offline as py
+
 py.init_notebook_mode(connected=True)
 
-import warnings
 warnings.filterwarnings('ignore')
+
+
 # ----------------------------------- #
 #            Laplace Test             #
 # ----------------------------------- #
 
 
-def test_laplace(x, alpha=0.05):
-    r"""
-    For a given vector of failure times, returns the Laplace Test result, showing if times are IID or not
+def test_laplace(failure_times, alpha=0.05):
+    """
+    For a given vector of failure times, returns the Laplace Test result
+    , resulting in a string that returns if times are IID or not.
 
-    :param x: Failure times
-    :param alpha: Confidence level
-    :return: Trend of the data
+    :param failure_times: Failure times vector (np.array)
+    :param alpha: Confidence level (float)
+    :return: Trend of the data (string)
     """
 
-    if len(x) < 4:
+    if len(failure_times) < 4:
 
-        raise ValueError("Sample size is not big enough for Laplace Test for trend.")
+        raise ValueError("Sample size is not big enough for Laplace Test for "
+                         "trend (minimum size = 4).")
 
     else:
 
-        total_time = x.sum()
-        number_of_times = len(x)
-        sum_elapsed_times = x.cumsum().sum() - total_time
+        total_time = failure_times.sum()
+        number_of_times = len(failure_times)
+        sum_elapsed_times = failure_times.cumsum().sum() - total_time
 
-        test_score = np.sqrt(12 * (number_of_times - 1)) * (sum_elapsed_times /
-                                                            ((number_of_times - 1) * total_time) - 0.5)
+        test_score = np.sqrt(12 * (number_of_times-1)) * \
+                            (sum_elapsed_times / ((number_of_times-1)
+                                                  * total_time) - 0.5)
 
-        back_limit, front_limit = stats.norm.interval(1-alpha, 0, 1)[0], stats.norm.interval(1-alpha, 0, 1)[1]
-        print(back_limit)
+        back_limit, front_limit = stats.norm.interval(1 - alpha, 0, 1)[0], \
+            stats.norm.interval(1 - alpha, 0, 1)[1]
+
         if test_score <= back_limit:
             return 'Positive Trend'
         elif test_score >= front_limit:
@@ -46,19 +52,22 @@ def test_laplace(x, alpha=0.05):
         else:
             return 'IID Times'
 
+
 # ----------------------------------- #
 #              PlotProb               #
 # ----------------------------------- #
-def probplot(dist_fun, params, t, CI=0.95,
-             plot_title='', ax=None):
+def prob_plot(dist_fun, params, t, CI=0.95,
+              plot_title='', ax=None):
     r"""
     Probability plot. Similar to QQ plot.
 
     :param dist_fun: an object of the initialized distribution function.
     :param params: distribution law parameter. eg. shape, location, etc.
     :param t: a vector of the time values.
-    :param CI: a float belonging to the interval of ]0,1, representing the Confidence Interval for the fitted line.
-    :param plot_title: a string with the title to be displayed in the plot. Optional.
+    :param CI: a float belonging to the interval of ]0,1], representing the
+     Confidence Interval for the fitted line.
+    :param plot_title: a string with the title to be displayed in the plot.
+     Optional.
     :param ax: an object containing an axes of matplotlib. Optional.
     :return ax: an object containing an axes of matplotlib and the drawn plot.
     """
@@ -112,10 +121,10 @@ def probplot(dist_fun, params, t, CI=0.95,
 
     # plot confidence limits
     ax.plot(x_qq, lower, 'b--',
-            label='Lower confidence limit ({}%)'.format(int(CI*100))
+            label='Lower confidence limit ({}%)'.format(int(CI * 100))
             )
     ax.plot(x_qq, upper, 'b--',
-            label='Upper confidence limit ({}%)'.format(int(CI*100))
+            label='Upper confidence limit ({}%)'.format(int(CI * 100))
             )
 
     ax.set_title('Probability Plot ' + plot_title)
@@ -190,7 +199,7 @@ def r_sq(dist_fun, params, x):
     cdf_prob = dist_fun.cdf(params, x_unique)
 
     # compute R^2
-    return np.corrcoef(cdf_prob, ecdf_prob)[0, 1]**2
+    return np.corrcoef(cdf_prob, ecdf_prob)[0, 1] ** 2
 
 
 # ----------------------------------- #
@@ -256,9 +265,8 @@ def rank_dist(x, x_censored=None, method='MLE', distributions=None, display=True
 
     elif method.lower() == 'mle':  # Maximum Likelihood Estimation
         for dist_i in dist_index:
-
             result[dist_names[dist_i]] = dict()
-            result[dist_names[dist_i]]['params'] = dist_funs[dist_i].fit(x, method='mle')
+            result[dist_names[dist_i]]['params'] = dist_funs[dist_i].fit(x, x_censored=x_censored, method='mle')
 
             result[dist_names[dist_i]]['goodness_of_fit'] = dict()
 
@@ -279,9 +287,9 @@ def rank_dist(x, x_censored=None, method='MLE', distributions=None, display=True
             res_df['KS'] = [result[k]['goodness_of_fit']['ks'] for k in result.keys()]
 
             res_df['rank dist MLE'] = (
-                res_df['LK'].rank(ascending=False) * .5 + res_df['R_sq'].rank(ascending=False) * .1 + res_df[
-                    'KS'].rank(
-                    ascending=False) * .4).rank()
+                    res_df['LK'].rank(ascending=False) * .5 + res_df['R_sq'].rank(ascending=False) * .1 + res_df[
+                'KS'].rank(
+                ascending=False) * .4).rank()
 
             qgrid.show_grid(res_df.sort_values('rank dist MLE'))
 
@@ -311,22 +319,22 @@ def rank_dist(x, x_censored=None, method='MLE', distributions=None, display=True
             res_df['KS'] = [result[k]['goodness_of_fit']['ks'] for k in result.keys()]
 
             res_df['rank dist LSQ'] = (
-                res_df['LK'].rank(ascending=False) * .3 + res_df['R_sq'].rank(ascending=False) * .2 + res_df[
-                    'KS'].rank(
-                    ascending=False) * .5).rank()
+                    res_df['LK'].rank(ascending=False) * .3 + res_df['R_sq'].rank(ascending=False) * .2 + res_df[
+                'KS'].rank(
+                ascending=False) * .5).rank()
 
             qgrid.show_grid(res_df.sort_values('rank dist LSQ'))
 
     else:
         raise ValueError('The method specified is not defined.')
 
-    return result # a dictionary or a data frame with rankings for each method
+    return result  # a dictionary or a data frame with rankings for each method
 
 
 # ----------------------------------- #
 #          combine rankings           #
 # ----------------------------------- #
-def combine_ranks(res_mle, res_ls,display=True):
+def combine_ranks(res_mle, res_ls, display=True):
     """
     A function for combining the rankings provided by both fitting methods, i.e. MLE and LSQ.
 
@@ -351,9 +359,10 @@ def combine_ranks(res_mle, res_ls,display=True):
 
     ranking_all = pd.DataFrame()
 
-    ranking_all['rank dist ALL'] = (res_df_mle['LK'].rank(ascending=False) * .5 + res_df_ls['LK'].rank(ascending=False) * .3 +
-                   res_df_mle['R_sq'].rank(ascending=False) * .1 + res_df_ls['R_sq'].rank(ascending=False) * .2 +
-                   res_df_mle['KS'].rank(ascending=False) * .4 + res_df_ls['KS'].rank(ascending=False) * .5).rank()
+    ranking_all['rank dist ALL'] = (
+                res_df_mle['LK'].rank(ascending=False) * .5 + res_df_ls['LK'].rank(ascending=False) * .3 +
+                res_df_mle['R_sq'].rank(ascending=False) * .1 + res_df_ls['R_sq'].rank(ascending=False) * .2 +
+                res_df_mle['KS'].rank(ascending=False) * .4 + res_df_ls['KS'].rank(ascending=False) * .5).rank()
 
     if display is True:
         qgrid.set_grid_option('fullWidthRows', True)
@@ -394,43 +403,43 @@ def plot_best(ranking_all, x):
     params_dist_lsq = dist_funs[dist_index[0]].fit(x, method='lsq')
 
     if dist_names[dist_index[0]] in ['normal', 'logistic']:
-        x_plot = np.linspace(x.min()-x.min()*.5, x.max() + x.max()*.5, 100)
+        x_plot = np.linspace(x.min() - x.min() * .5, x.max() + x.max() * .5, 100)
     else:
-        x_plot = np.linspace(1e-6, x.max() + x.max()*.5, 100)
+        x_plot = np.linspace(1e-6, x.max() + x.max() * .5, 100)
 
-    pdf_mle = dist_funs[dist_index[0]].pdf(params_dist_mle,  x_plot)
+    pdf_mle = dist_funs[dist_index[0]].pdf(params_dist_mle, x_plot)
 
-    pdf_lsq = dist_funs[dist_index[0]].pdf(params_dist_lsq,  x_plot)
+    pdf_lsq = dist_funs[dist_index[0]].pdf(params_dist_lsq, x_plot)
 
-    fig, ax = plt.subplots(2,2,figsize=(10,10))
+    fig, ax = plt.subplots(2, 2, figsize=(10, 10))
 
-    ax[0,0].plot(x_plot, pdf_mle, '--')
-    ax[0,0].plot(x_plot, pdf_lsq, '--')
+    ax[0, 0].plot(x_plot, pdf_mle, '--')
+    ax[0, 0].plot(x_plot, pdf_lsq, '--')
 
-    ax[0,0].hist(x, normed=True, alpha=.5)
-    ax[0,0].legend(['MLE', 'LSQ', 'Histogram data'])
+    ax[0, 0].hist(x, normed=True, alpha=.5)
+    ax[0, 0].legend(['MLE', 'LSQ', 'Histogram data'])
 
     # plt.show()
-    ax[0,0].set_title('Best Fit: {},\n PDF'.format(best_dist))
+    ax[0, 0].set_title('Best Fit: {},\n PDF'.format(best_dist))
 
     print('MLE params: {}'.format(params_dist_mle))
     print('LSQ params: {}'.format(params_dist_lsq))
 
-    ax[0,1].plot(x_plot, 1 - dist_funs[dist_index[0]].cdf(params_dist_mle, x_plot))
-    ax[0,1].plot(x_plot, 1 - dist_funs[dist_index[0]].cdf(params_dist_lsq, x_plot))
+    ax[0, 1].plot(x_plot, 1 - dist_funs[dist_index[0]].cdf(params_dist_mle, x_plot))
+    ax[0, 1].plot(x_plot, 1 - dist_funs[dist_index[0]].cdf(params_dist_lsq, x_plot))
 
-    ax[0,1].set_yticks(np.arange(0, 1.05, .05))
-    #plt.xticks(range(0, int(np.max(x_plot)), 5))
+    ax[0, 1].set_yticks(np.arange(0, 1.05, .05))
+    # plt.xticks(range(0, int(np.max(x_plot)), 5))
 
-    ax[0,1].grid()
-    ax[0,1].legend(['MLE', 'LSQ'])
-    ax[0,1].set_title('Reliability Function 1-CDF')
-    ax[0,1].set_xlabel('time (t)')
-    ax[0,1].set_ylabel('Reliability')
+    ax[0, 1].grid()
+    ax[0, 1].legend(['MLE', 'LSQ'])
+    ax[0, 1].set_title('Reliability Function 1-CDF')
+    ax[0, 1].set_xlabel('time (t)')
+    ax[0, 1].set_ylabel('Reliability')
 
     # Probplot (similar to QQ)
-    probplot(dist_funs[dist_index[0]], params_dist_lsq, x, plot_title='LSQ', ax=ax[1,1])
-    probplot(dist_funs[dist_index[0]], params_dist_mle, x, plot_title='MLE', ax=ax[1,0])
+    probplot(dist_funs[dist_index[0]], params_dist_lsq, x, plot_title='LSQ', ax=ax[1, 1])
+    probplot(dist_funs[dist_index[0]], params_dist_mle, x, plot_title='MLE', ax=ax[1, 0])
 
     try:
         plt.tight_layout()
@@ -447,21 +456,25 @@ def plot_best(ranking_all, x):
 class Weibull(object):
     def __init__(self, shape=None, scale=None, loc=None):
         r"""
-        Initialize the weibull distribution function. You can fix any of the 3 parameters by passing it as the argument.
-        This might be especially useful for MLE of parameter for specific parameters at a time.
+        Initialize the weibull distribution function. You can fix any of the 3
+        parameters by passing it as the argument.
+        This might be especially useful for MLE of parameter for specific
+         parameters at a time.
 
         :param shape: Also known as Beta parameter.
         :param scale: Also known as Mu parameter.
         :param loc: Also known as Gamma parameter.
         """
         self._params = np.array([shape, scale, loc])
-        # self.params_i = list(np.where(self.params)[0])
-        self._not_params_i = [i for i, f in enumerate(self._params) if f is None]
+
+        self._not_params_i = [i for i, f in enumerate(self._params)
+                              if f is None]  # index of not defined params
 
     def fix(self, shape=None, scale=None, loc=None):
         self._params = np.array([shape, scale, loc])
-        # self.params_i = list(np.where(self.params)[0])
-        self._not_params_i = [i for i, f in enumerate(self._params) if f is None]
+
+        self._not_params_i = [i for i, f in enumerate(self._params)
+                              if f is None]  # index of not defined params
 
     # ----------------------------------- #
     #                  PDF                #
@@ -470,9 +483,11 @@ class Weibull(object):
         r"""
         Computes the PDF of Weibull 2 or 3 parameters.
 
-        :param params: a list of parameters containing shape, scale and location. If the length of parameter is lower
+        :param params: a list of parameters containing shape, scale and
+        location. If the length of parameter is lower
         than 3, than the parameter should be placed in order.
-        :param x: a number, a list, or an array of x values for computing probability.
+        :param x: a number, a list, or an array of x values for computing
+        probability.
         :return: Probability of x given the distribution parameters.
         """
 
@@ -488,12 +503,14 @@ class Weibull(object):
             print('not in params: {}'.format(self._not_params_i))
             raise ValueError('The size of parameters is not correct.')
 
+        x = np.array(x)
+
         shape = self._params[0]
         scale = self._params[1]
         loc = self._params[2]
 
-        prob = np.nan_to_num((shape / scale) * ((x - loc) / scale) ** (shape - 1) *\
-                             np.exp(-((x - loc) / scale)**shape))
+        prob = np.nan_to_num((shape / scale) * ((x-loc) / scale) **
+                             (shape-1) * np.exp(-((x-loc) / scale) ** shape))
 
         return prob
 
@@ -504,9 +521,11 @@ class Weibull(object):
         r"""
         Computes the CDF of Weibull 2 or 3 parameters.
 
-        :param params: a list of parameters containing 1) shape, 2) scale and 3) location. If the length of parameter is lower
+        :param params: a list of parameters containing 1) shape, 2) scale and 3)
+        location. If the length of parameter is lower
         than 3, than the parameters should be placed in the given order.
-        :param x: a number, a list, or an array of x values for computing probability.
+        :param x: a number, a list, or an array of x values for computing
+        probability.
         :return: Cumulative Probability for x given the distribution parameters.
         """
 
@@ -518,22 +537,26 @@ class Weibull(object):
 
             raise ValueError('The size of parameters is not correct.')
 
+        x = np.array(x)
+
         shape = self._params[0]
         scale = self._params[1]
         loc = self._params[2]
 
-        return np.nan_to_num(1-np.exp(-((x-loc)/scale)**shape))
+        return np.nan_to_num(1 - np.exp(-((x - loc) / scale) ** shape))
 
     # ----------------------------------- #
     #                1-CDF                #
     # ----------------------------------- #
     def inv_cdf(self, params, x):
         r"""
-        Computes the CDF of Weibull 2 or 3 parameters.
+        Computes the inverse of CDF of Weibull 2 or 3 parameters.
 
-        :param params: a list of parameters containing 1) shape, 2) scale and 3) location. If the length of parameter is lower
-        than 3, than the parameters should be placed in the given order.
-        :param x: a number, a list, or an array of x values for computing probability.
+        :param params: a list of parameters containing 1) shape, 2) scale and 3)
+        location. If the length of parameter is lower than 3, than the
+         parameters should be placed in the given order.
+        :param x: a number, a list, or an array of x values for
+        computing probability.
         :return: Cumulative Probability for x given the distribution parameters.
         """
 
@@ -549,7 +572,7 @@ class Weibull(object):
         scale = self._params[1]
         loc = self._params[2]
 
-        return np.nan_to_num(np.exp(-((x-loc)/scale)**shape))
+        return np.nan_to_num(np.exp(-((x - loc) / scale) ** shape))
 
     # ----------------------------------- #
     #                 PPF                 #
@@ -577,12 +600,13 @@ class Weibull(object):
     # ----------------------------------- #
     #              neg_log_lk             #
     # ----------------------------------- #
-    def neg_log_lk(self, params, x):
+    def neg_log_lk(self, params, x, x_censored=None):
         r"""
-        Computes negative sum of log-likelihood for the probability of x given the distribution parameters of Weibull 2
-        or 3 parameters. This function is useful as a cost function for optimization problem regarding Maximum
-        Likelihood Estimation (MLE) of the parameters. The log transformation is required to convert produtory of
-        the Likelihood function in a sum.
+        Computes negative sum of log-likelihood for the probability of x given
+        the distribution parameters of Weibull 2 or 3 parameters. This function
+        is useful as a cost function for optimization problem regarding Maximum
+        Likelihood Estimation (MLE) of the parameters. The log transformation is
+        required to convert product of the Likelihood function in a sum.
 
         :param params: a list of parameters containing shape, scale and location. If the length of parameter is lower
         than 3, than the parameter should be placed in order.
@@ -591,7 +615,7 @@ class Weibull(object):
         :return: negative sum of log-likelihood for the probability of x given the distribution parameters.
         """
 
-        return -np.nansum(np.log(np.nan_to_num(self.pdf(params, x))))
+        return -np.nansum(np.log(np.nan_to_num(self.pdf(params, x) + np.nan_to_num(self.cdf(params, x_censored)))))
 
     # ----------------------------------- #
     #                log_lk               #
@@ -613,7 +637,7 @@ class Weibull(object):
     # ----------------------------------- #
     #                 fit                 #
     # ----------------------------------- #
-    def fit(self, x, method='MLE', implementation=None):
+    def fit(self, x, x_censored=None, method='MLE', implementation=None):
         r"""
         Fits the distribution to the data returning the parameters defining the Weibull distribution.
         By default it estimates the 3 parameters via MLE. The user may choose the regression method for fitting,
@@ -689,13 +713,13 @@ class Weibull(object):
                     self.fix()  # initialize params
                     res_init = opt.differential_evolution(self.neg_log_lk,
                                                           # popsize=10,
-                                                          bounds=bounds_weibull, args=(x,))
+                                                          bounds=bounds_weibull, args=(x, x_censored,))
 
                     # second locally optimize all parameter by gradient method to converge to the local minimum
                     res_opt = opt.minimize(self.neg_log_lk, res_init.x, args=(x,),
-                                     #method='L-BFGS-B',
-                                     # method='Nelder-Mead',
-                                     #bounds=bounds_weibull
+                                           # method='L-BFGS-B',
+                                           # method='Nelder-Mead',
+                                           # bounds=bounds_weibull
                                            )
 
                     params_global = list(res_opt.x)
@@ -738,7 +762,8 @@ class Weibull(object):
 
                     # make ensemble
                     params = list(
-                        np.sum([(1-p_value_global) * np.array(params_rs), p_value_global * np.array(params_global)], axis=0))  # weighted sum
+                        np.sum([(1 - p_value_global) * np.array(params_rs), p_value_global * np.array(params_global)],
+                               axis=0))  # weighted sum
 
                     self.fix()
 
@@ -756,9 +781,9 @@ class Weibull(object):
 
                     # second locally optimize all parameter by gradient method to converge to the local minimum
                     res_opt = opt.minimize(self.neg_log_lk, res_init.x, args=(x,),
-                                     #method='L-BFGS-B',
-                                     # method='Nelder-Mead',
-                                     #bounds=bounds_weibull
+                                           # method='L-BFGS-B',
+                                           # method='Nelder-Mead',
+                                           # bounds=bounds_weibull
                                            )
 
                     params = list(res_opt.x)
@@ -767,7 +792,6 @@ class Weibull(object):
                     raise ValueError('Implementation selected is not defined for 3 parameter Weibull.')
 
             elif method.lower() == 'lsq':
-
 
                 # 1) compute the empirical distribution function for the presented data:
                 x_unique, ecdf_prob = ecdf(x)
@@ -784,7 +808,7 @@ class Weibull(object):
                                                       # popsize=10,
                                                       bounds=bounds_weibull, args=(x,))
 
-                errfunc = lambda p, t, y: np.sum((self.cdf(p, t) - y)**2)  # sse
+                errfunc = lambda p, t, y: np.sum((self.cdf(p, t) - y) ** 2)  # sse
 
                 res_1 = opt.minimize(errfunc, res_init.x, args=(x_unique, ecdf_prob),
                                      method='L-BFGS-B',
@@ -798,10 +822,10 @@ class Weibull(object):
 
         elif (len(self._not_params_i) <= 2) & (len(self._not_params_i) != 0):
             init_params = np.array([0, np.mean(x), np.min(x)])[self._not_params_i]
-            #print('not_params:', self._not_params_i)
-            #print('init_params:', init_params)
+            # print('not_params:', self._not_params_i)
+            # print('init_params:', init_params)
             bounds_weibull = np.array([(1e-6, 2), (1, np.max(x)), (0, 3 - 1e-6)])[self._not_params_i]
-            #('bounds_weibull:', bounds_weibull)
+            # ('bounds_weibull:', bounds_weibull)
             if implementation is None:
                 implementation = 'nano'
 
@@ -1034,7 +1058,8 @@ class Normal(object):
     # ----------------------------------- #
     #                 fit                 #
     # ----------------------------------- #
-    def fit(self, x, method='mle'):  # TODO add method and implementation kwds (if really necessary, or for homogeneity of functions)
+    def fit(self, x,
+            method='mle'):  # TODO add method and implementation kwds (if really necessary, or for homogeneity of functions)
         r"""
         Fits the distribution to the data returning the parameters defining the Normal distribution.
                 By default it estimates the 2 parameters via direct method. The user may fix any of the  parameters by
@@ -1047,7 +1072,7 @@ class Normal(object):
 
         params = []
 
-        if method.lower() =='mle':
+        if method.lower() == 'mle':
 
             if len(self._not_params_i) == 2:
 
@@ -1252,7 +1277,8 @@ class Lognormal(object):
     # ----------------------------------- #
     #                 fit                 #
     # ----------------------------------- #
-    def fit(self, x, method='MLE'):  # TODO add implementation kwds (if really necessary, or for homogeneity of functions)
+    def fit(self, x,
+            method='MLE'):  # TODO add implementation kwds (if really necessary, or for homogeneity of functions)
         r"""
         Fits the distribution to the data returning the parameters defining the Log-Normal distribution.
                 By default it estimates the 2 parameters via direct method. The user may fix any of the  parameters by
@@ -1294,7 +1320,7 @@ class Lognormal(object):
             res_init = [np.log(x.mean()), np.log(x).std()]
 
             params, _ = opt.leastsq(self.errfunc, res_init, args=(x_unique, ecdf_prob,)
-                                     )
+                                    )
             params = list(params)
 
             # res = opt.minimize(self.errfunc, res_init, args=(x_unique, ecdf_prob))
@@ -1336,6 +1362,7 @@ class Exponential(object):
         # ----------------------------------- #
         #                fix                  #
         # ----------------------------------- #
+
     def fix(self, scale=None, loc=None):
         self._params = np.array([scale, loc])
         self._not_params_i = [i for i, f in enumerate(self._params) if f is None]
@@ -1343,6 +1370,7 @@ class Exponential(object):
         # ----------------------------------- #
         #                 PDF                 #
         # ----------------------------------- #
+
     def pdf(self, params, x):
         r"""
         Computes the PDF of Normal distribution. A Normal (Gaussian) distribution is usually described by two
@@ -1371,6 +1399,7 @@ class Exponential(object):
         # ----------------------------------- #
         #                 CDF                 #
         # ----------------------------------- #
+
     def cdf(self, params, x):
         r"""
         Computes the CDF of an exponential distribution.
@@ -1397,6 +1426,7 @@ class Exponential(object):
         # ----------------------------------- #
         #                 PPF                 #
         # ----------------------------------- #
+
     def ppf(self, params, q):
         r"""
             Computes the PPF of an exponential distribution.
@@ -1417,6 +1447,7 @@ class Exponential(object):
         # ----------------------------------- #
         #              neg_log_lk             #
         # ----------------------------------- #
+
     def neg_log_lk(self, params, x):
         r"""
         Computes negative sum of log-likelihood for the probability of x given the distribution parameters. This
@@ -1444,6 +1475,7 @@ class Exponential(object):
         # ----------------------------------- #
         #               log_lk                #
         # ----------------------------------- #
+
     def log_lk(self, params, x):
         r"""
         Computes sum of log-likelihood for the probability of x given the distribution parameters.
@@ -1471,7 +1503,9 @@ class Exponential(object):
         # ----------------------------------- #
         #                 fit                 #
         # ----------------------------------- #
-    def fit(self, x, method='MLE'):  # TODO add implementation kwds (if really necessary, or for homogeneity of functions)
+
+    def fit(self, x,
+            method='MLE'):  # TODO add implementation kwds (if really necessary, or for homogeneity of functions)
         r"""
         Fits the distribution to the data returning the parameters defining the Log-Normal distribution.
                 By default it estimates the 2 parameters via direct method. The user may fix any of the  parameters by
@@ -1527,7 +1561,7 @@ class Exponential(object):
                 #  converges to an undesirable minimum i.e. loc>min_x
                 # params = list(params)
 
-                errfunc = lambda p, t, y: np.sum((self.cdf(p, t) - y)**2)  # sse
+                errfunc = lambda p, t, y: np.sum((self.cdf(p, t) - y) ** 2)  # sse
 
                 res_1 = opt.minimize(errfunc, res_init, args=(x_unique, ecdf_prob),
                                      method='L-BFGS-B',
@@ -1589,6 +1623,7 @@ class Logistic(object):
         # ----------------------------------- #
         #                fix                  #
         # ----------------------------------- #
+
     def fix(self, scale=None, loc=None):
         self._params = np.array([scale, loc])
         self._not_params_i = [i for i, f in enumerate(self._params) if f is None]
@@ -1596,6 +1631,7 @@ class Logistic(object):
         # ----------------------------------- #
         #                 PDF                 #
         # ----------------------------------- #
+
     def pdf(self, params, x):
         r"""
         $f(z; \mu, \sigma) = \frac{e^z}{\sigma \cdot (1+e^z)^2} $, where $z = \frac{x-\mu}{\sigma}$
@@ -1624,6 +1660,7 @@ class Logistic(object):
         # ----------------------------------- #
         #                 CDF                 #
         # ----------------------------------- #
+
     def cdf(self, params, x):
         r"""
         Computes the CDF of a Logistic distribution.
@@ -1644,11 +1681,12 @@ class Logistic(object):
 
         # Compute and return the PDF for the given x.
         z = (x - loc) / scale
-        return 1/(1 + np.exp(-z))
+        return 1 / (1 + np.exp(-z))
 
         # ----------------------------------- #
         #                 PPF                 #
         # ----------------------------------- #
+
     def ppf(self, params, q):
         r"""
         Computes the PPF of a Logistic distribution.
@@ -1669,6 +1707,7 @@ class Logistic(object):
         # ----------------------------------- #
         #              neg_log_lk             #
         # ----------------------------------- #
+
     def neg_log_lk(self, params, x):
         r"""
         Computes negative sum of log-likelihood for the probability of x given the distribution parameters. This
@@ -1686,6 +1725,7 @@ class Logistic(object):
         # ----------------------------------- #
         #               log_lk                #
         # ----------------------------------- #
+
     def log_lk(self, params, x):
         r"""
         Computes sum of log-likelihood for the probability of x given the distribution parameters.
@@ -1702,7 +1742,9 @@ class Logistic(object):
         # ----------------------------------- #
         #                 fit                 #
         # ----------------------------------- #
-    def fit(self, x, method='MLE', implementation=None):  # TODO add implementation kwds (if really necessary, or for homogeneity of functions)
+
+    def fit(self, x, method='MLE',
+            implementation=None):  # TODO add implementation kwds (if really necessary, or for homogeneity of functions)
         r"""
         Fits the distribution to the data returning the parameters defining the Logistic distribution.
                 By default it estimates the 2 parameters via direct method. The user may fix any of the  parameters by
@@ -1719,7 +1761,7 @@ class Logistic(object):
 
         if len(self._not_params_i) <= 2:  # if the initialization was made with no fixed parameters
             init_params = np.array([1, np.mean(x), np.min(x)])[self._not_params_i]
-            bounds_logistic = np.array(((1e-6, 1e10), (-1e10, 1e10)),dtype=float)
+            bounds_logistic = np.array(((1e-6, 1e10), (-1e10, 1e10)), dtype=float)
 
             if implementation is None:
                 implementation = 'nano'
@@ -1793,6 +1835,7 @@ class Loglogistic(object):
         # ----------------------------------- #
         #                fix                  #
         # ----------------------------------- #
+
     def fix(self, shape=None, scale=None):
         self._params = np.array([shape, scale])
         self._not_params_i = [i for i, f in enumerate(self._params) if f is None]
@@ -1800,6 +1843,7 @@ class Loglogistic(object):
         # ----------------------------------- #
         #                 PDF                 #
         # ----------------------------------- #
+
     def pdf(self, params, x):
         r"""
         Probability Density Function (PDF) of log-logistic distribution.
@@ -1825,6 +1869,7 @@ class Loglogistic(object):
         # ----------------------------------- #
         #                 CDF                 #
         # ----------------------------------- #
+
     def cdf(self, params, x):
         r"""
         Computes the CDF of a Logistic distribution.
@@ -1845,11 +1890,12 @@ class Loglogistic(object):
 
         # Compute and return the PDF for the given x.
         z = (np.log(x) - scale) / shape
-        return 1/(1 + np.exp(-z))
+        return 1 / (1 + np.exp(-z))
 
         # ----------------------------------- #
         #                 PPF                 #
         # ----------------------------------- #
+
     def ppf(self, params, q):
         r"""
         Computes the PPF of a Loglogistic distribution.
@@ -1873,6 +1919,7 @@ class Loglogistic(object):
         # ----------------------------------- #
         #              neg_log_lk             #
         # ----------------------------------- #
+
     def neg_log_lk(self, params, x):
         r"""
         Computes negative sum of log-likelihood for the probability of x given the distribution parameters. This
@@ -1890,6 +1937,7 @@ class Loglogistic(object):
         # ----------------------------------- #
         #               log_lk                #
         # ----------------------------------- #
+
     def log_lk(self, params, x):
         r"""
         Computes sum of log-likelihood for the probability of x given the distribution parameters.
@@ -1906,7 +1954,9 @@ class Loglogistic(object):
         # ----------------------------------- #
         #                 fit                 #
         # ----------------------------------- #
-    def fit(self, x, method='MLE', implementation=None):  # TODO add implementation kwds (if really necessary, or for homogeneity of functions)
+
+    def fit(self, x, method='MLE',
+            implementation=None):  # TODO add implementation kwds (if really necessary, or for homogeneity of functions)
         r"""
         Fits the distribution to the data returning the parameters defining the Logistic distribution.
                 By default it estimates the 2 parameters via direct method. The user may fix any of the  parameters by
@@ -1930,7 +1980,6 @@ class Loglogistic(object):
 
             if method.lower() == 'mle':
                 if implementation.lower() == 'nano':
-
                     res_init = opt.differential_evolution(self.neg_log_lk, args=(x,),
                                                           bounds=bounds_logistic
                                                           )
@@ -1947,7 +1996,7 @@ class Loglogistic(object):
 
                 if implementation.lower() == 'scipy':
                     shape, _, scale = stats.fisk.fit(x, floc=0)  # first and second moments
-                    params = [1/shape, np.log(scale)]  # alternative form of representation (i.e. standardized)
+                    params = [1 / shape, np.log(scale)]  # alternative form of representation (i.e. standardized)
 
             elif method.lower() == 'lsq':
                 # 1) compute the empirical distribution function for the presented data:
@@ -1963,7 +2012,7 @@ class Loglogistic(object):
                 #                                       )
                 # loc, scale = stats.logistic.fit_loc_scale(x)  # first and second moments
                 # res_init = [scale, loc]
-                res_init = [1,1]
+                res_init = [1, 1]
 
                 params, _ = opt.leastsq(errfunc, res_init, args=(x_unique, ecdf_prob))
                 params = list(params)
