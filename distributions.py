@@ -608,31 +608,46 @@ class Weibull(object):
         Likelihood Estimation (MLE) of the parameters. The log transformation is
         required to convert product of the Likelihood function in a sum.
 
-        :param params: a list of parameters containing shape, scale and location. If the length of parameter is lower
-        than 3, than the parameter should be placed in order.
-        :param x: a number, a list, or an array of x values for computing probability.
-        :param x_censored: a number, a list, or an array of x values for computing cumulative probability.
-        :return: negative sum of log-likelihood for the probability of x given the distribution parameters.
+        :param params: a list of parameters containing shape, scale and
+        location. If the length of parameter is lower than 3, then the parameter
+        should be placed in order.
+        :param x: a number, a list, or an array of x values for computing
+        probability.
+        :param x_censored: a number, a list, or an array of x values for
+        computing cumulative probability.
+        :return: negative sum of log-likelihood for the probability of x given
+        the distribution parameters.
         """
+        # Uncensored probability
+        prob_x = np.nan_to_num(self.pdf(params, x))
+        # Censored probability
+        prob_x_censored = np.nan_to_num(self.cdf(params, x_censored))
 
-        return -np.nansum(np.log(np.nan_to_num(self.pdf(params, x) + np.nan_to_num(self.cdf(params, x_censored)))))
+        return -np.nansum(np.log(prob_x + prob_x_censored))
 
     # ----------------------------------- #
     #                log_lk               #
     # ----------------------------------- #
-    def log_lk(self, params, x):
+    def log_lk(self, params, x, x_censored=None):
         r"""
-        Computes sum of log-likelihood for the probability of x given the distribution parameters of Weibull 2
-        or 3 parameters. This function is useful for model validation, i.e. goodness-of-fit. The log transformation is
-        required to convert produtory of the Likelihood function in a sum.
+        Computes sum of log-likelihood for the probability of x given the
+        distribution parameters of Weibull 2 or 3 parameters. This function is
+        useful for model validation, i.e. goodness-of-fit. The log
+        transformation is required to convert product of the Likelihood
+        function in a sum.
 
-        :param params: a list of parameters containing shape, scale and location. If the length of parameter is lower
-        than 3, than the parameter should be placed in order.
+        :param params: a list of parameters containing shape, scale and
+        location. If the length of parameter is lower  than 3, than the
+        parameter should be placed in order.
         :param x: a number, a list, or an array of x values for computing probability.
         :return: negative sum of log-likelihood for the probability of x given the distribution parameters.
         """
+        # Uncensored probability
+        prob_x = np.nan_to_num(self.pdf(params, x))
+        # Censored probability
+        prob_x_censored = np.nan_to_num(self.cdf(params, x_censored))
 
-        return np.nansum(np.log(np.nan_to_num(self.pdf(params, x))))
+        return np.nansum(np.log(prob_x + prob_x_censored))
 
     # ----------------------------------- #
     #                 fit                 #
