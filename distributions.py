@@ -137,8 +137,9 @@ def prob_plot(dist_fun, params, t, CI=0.95,
 # ----------------------------------- #
 def ecdf(x):
     r"""
-    Empirical Cumulative Distribution Function for fitting a distribution. It is required for fitting a
-    distribution using the least squares method.
+    Empirical Cumulative Distribution Function for fitting a distribution. It is
+    required for fitting a distribution using the least squares method and for
+    the Kolmogorov-Smirnov test.
 
     :param x: a list, or an array of x values for computing the probabilities.
     :return: x_unique, cdf_prob
@@ -154,14 +155,19 @@ def ecdf(x):
 # ----------------------------------- #
 def ks_test(dist_fun, params, x):
     r"""
-    Compute Kolmogorov-Smirnov test. The null hypothesis is that 2 independent samples are drawn from the same
-    continuous distribution. Therefore, this function returns the p-value of this statistical test. The null hypothesis
-    is that 2 independent samples are drawn from the same continuous distribution.
+    Compute Kolmogorov-Smirnov test. The null hypothesis is that 2 independent
+    samples are drawn from the same continuous distribution. Therefore, this
+    function returns the p-value of this statistical test. The null hypothesis
+    is that 2 independent samples are drawn from the same continuous
+    distribution.
 
-    :param dist_fun: the initialized class of the distribution function. eg. analytics_stat.distributions.Weibull()
-    :param params: a list of parameters defining the distribution function. If the length of parameter is lower
-    than 3, than the parameters should be placed in the given order.
-    :param x: a number, a list, or an array of x values for computing the probabilities.
+    :param dist_fun: the initialized class of the distribution function.
+    eg. analytics_stat.distributions.Weibull()
+    :param params: a list of parameters defining the distribution function.
+    If the length of parameter is lower than 3, than the parameters should be
+    placed in the given order.
+    :param x: a number, a list, or an array of x values for computing the
+    probabilities.
 
     :return: p-value regarding the hypothesis testing.
     """
@@ -173,7 +179,8 @@ def ks_test(dist_fun, params, x):
     cdf_prob = dist_fun.cdf(params, x_unique)
 
     # compute Kolmogorov-Smirnov test
-    # The null hypothesis is that 2 independent samples are drawn from the same continuous distribution.
+    # The null hypothesis is that 2 independent samples are drawn from the same
+    # continuous distribution.
     _, p_value = stats.ks_2samp(ecdf_prob, cdf_prob)
 
     return p_value
@@ -619,11 +626,16 @@ class Weibull(object):
         the distribution parameters.
         """
         # Uncensored probability
-        prob_x = np.nan_to_num(self.pdf(params, x))
+        prob_x = np.sum(np.log(np.nan_to_num(self.pdf(params, x))))
         # Censored probability
-        prob_x_censored = np.nan_to_num(self.cdf(params, x_censored))
+        if x_censored:
+            prob_x_censored = np.sum(np.log(np.nan_to_num(self.cdf(params,
+                                                                   x_censored)))
+                                     )
+        else:
+            prob_x_censored = 0
 
-        return -np.nansum(np.log(prob_x + prob_x_censored))
+        return -np.nansum(prob_x) - np.nansum(prob_x_censored)
 
     # ----------------------------------- #
     #                log_lk               #
@@ -647,9 +659,9 @@ class Weibull(object):
         the distribution parameters.
         """
         # Uncensored probability
-        prob_x = np.nan_to_num(self.pdf(params, x))
+        prob_x = np.sum(np.nan_to_num(self.pdf(params, x)))
         # Censored probability
-        prob_x_censored = np.nan_to_num(self.cdf(params, x_censored))
+        prob_x_censored = np.sum(np.nan_to_num(self.cdf(params, x_censored)))
 
         return np.nansum(np.log(prob_x + prob_x_censored))
 
@@ -681,14 +693,7 @@ class Weibull(object):
             # Most likelihood estimation method
             if method.lower() == 'mle':
 
-                # Scipy library fitting
-                if implementation == 'scipy':
-
-                    shape, loc, scale = stats.weibull_min.fit(x)
-                    params = [shape, scale, loc]
-
-                #
-                elif implementation.lower() == 'reliasoft':
+                if implementation.lower() == 'reliasoft':
                     # First fix location at 0 and find shape and scale.
                     self.fix(loc=0)
 
@@ -739,31 +744,34 @@ class Weibull(object):
                     # TODO Get better assumptions for beta and gamma (ours)
                     bounds_weibull = [(1e-6, 2), (1, np.max(x)), (0, 3 - 1e-6)]
 
-                    # first globally optimize all parameter by differential evolution to avoid local minima
+                    # first globally optimize all parameter by differential
+                    # evolution to avoid local minimum
                     self.fix()  # initialize params
                     res_init = opt.differential_evolution(self.neg_log_lk,
-                                                          # popsize=10,
-                                                          bounds=bounds_weibull, args=(x, x_censored,))
-
-                    # second locally optimize all parameter by gradient method to converge to the local minimum
-                    res_opt = opt.minimize(self.neg_log_lk, res_init.x, args=(x,),
+                                                          bounds=bounds_weibull,
+                                                          args=(x, x_censored,))
+                    print(res_init.x)
+                    # second locally optimize all parameter by gradient method
+                    # to converge to the local minimum
+                    res_opt = opt.minimize(self.neg_log_lk, res_init.x,
+                                           args=(x, x_censored),
                                            # method='L-BFGS-B',
                                            # method='Nelder-Mead',
-                                           # bounds=bounds_weibull
+                                           bounds=bounds_weibull
                                            )
-
+                    print(res_opt.x)
                     params_global = list(res_opt.x)
 
                     # model 2) Reliasoft: ----------------
                     # First fix location at 0 and find shape and scale
-                    # First fix location at 0 and find shape and scale.
                     self.fix(loc=0)
 
-                    res_1 = opt.minimize(self.neg_log_lk, [1, np.mean(x)], args=(x,),
+                    res_1 = opt.minimize(self.neg_log_lk, [1, np.mean(x)],
+                                         args=(x,x_censored,),
                                          # method='L-BFGS-B',
                                          method='Nelder-Mead'
                                          )
-
+                    print(res_1.x)
                     # print(res_1.success)
                     params_init = res_1.x
                     # print('Params 1): {}'.format(params_init))
@@ -771,7 +779,7 @@ class Weibull(object):
                     # Second fix shape and scale and find Location
                     self.fix(shape=params_init[0], scale=params_init[1])
 
-                    res_2 = opt.minimize(self.neg_log_lk, [np.min(x)], args=(x,),
+                    res_2 = opt.minimize(self.neg_log_lk, [np.min(x)], args=(x,x_censored,),
                                          # method='L-BFGS-B'
                                          method='Nelder-Mead'
                                          )
@@ -780,20 +788,21 @@ class Weibull(object):
                     loc_rs = res_2.x[0]
                     # print('loc 2): {}'.format(loc_our))
 
-                    # third locally optimize shape and scale  by gradient method, fixing location
+                    # third locally optimize shape and scale  by gradient
+                    # method, fixing location
                     self.fix(loc=loc_rs)
 
-                    res_3 = opt.minimize(self.neg_log_lk, params_init, args=(x,))
+                    res_3 = opt.minimize(self.neg_log_lk, params_init,
+                                         args=(x,x_censored,))
 
                     # print(res_3.success)
                     params_rs = np.append(res_3.x, loc_rs)
-
+                    print(params_rs)
                     p_value_global = ks_test(Weibull(), params_global, x)
-
+                    print(p_value_global)
                     # make ensemble
                     params = list(
-                        np.sum([(1 - p_value_global) * np.array(params_rs), p_value_global * np.array(params_global)],
-                               axis=0))  # weighted sum
+                        np.sum([(1-p_value_global) * np.array(params_rs), p_value_global * np.array(params_global)], axis=0))  # weighted sum
 
                     self.fix()
 
@@ -861,9 +870,9 @@ class Weibull(object):
 
             if method.lower() == 'mle':
                 if implementation.lower() == 'nano':
-                    res_1 = opt.minimize(self.neg_log_lk, init_params, args=(x,),
-                                         method='L-BFGS-B',
-                                         # method='Nelder-Mead',
+                    res_1 = opt.minimize(self.neg_log_lk, init_params, args=(x,x_censored),
+                                         #method='L-BFGS-B',
+                                         method='Nelder-Mead',
                                          bounds=bounds_weibull
                                          )
 
