@@ -7,3 +7,7 @@ My projects during my master's thesis and first job at EQS
 ```
 pip install spacy
 ```
+
+```
+import pandas as pd
+```
