@@ -1,4 +1,4 @@
-![Alt text](eqs.png?raw=true "EQS") ![Alt text](feup.png?raw=true "EQS")
+![Alt text](eqs.png "EQS") ![Alt text](feup.png "EQS")
 
 
 
