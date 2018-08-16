@@ -1,5 +1,4 @@
-<img align="left" width="100" height="100" src="eqs.png"> ![Alt text](feup.png "FEUP")
-
+<img align="left" width="194" height="64" src="eqs.png"> <img align="right" width="199" height="69" src="feup.png"> 
 
 
 # sergio2018
