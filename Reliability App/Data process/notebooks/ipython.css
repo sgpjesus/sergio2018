@@ -5,7 +5,7 @@
 }
 
 #notebook:before{
-	content:url('EQSLogo.jpg');
+	content:url('/eqs.png');
 }
 
 .widget-text {
